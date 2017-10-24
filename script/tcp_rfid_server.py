@@ -18,9 +18,8 @@ carriers_dict = dict(
 	)
 FINAL_STATE = 50
 
-#IP = '172.20.66.156'
-IP = 'localhost'
-PORT = 60104
+IP = '172.20.66.156'
+PORT = 60106
 BUFFER_SIZE = 4096
 
 def save_carrier_states():
@@ -48,15 +47,13 @@ def carrier_logic(rfid):
 		print 'Invalid RFID: {}'.format(rfid)
 
 	print 'Sending command: {}'.format(command)
-	print 'DICT: {}'.format(carriers_dict)
+	#print 'DICT: {}'.format(carriers_dict)
 	return str(command)
 
 def handle_client_connection(client_s,):
 	rfid = 'rfid'
-	while True:
-		data_in = client_s.recv(BUFFER_SIZE)
-		if not data_in: break
-		rfid += data_in
+	data_in = client_s.recv(BUFFER_SIZE)
+	rfid += data_in
 	print 'Received: {}'.format(rfid)
 	cmd = carrier_logic(rfid)
 	client_s.send(cmd)
