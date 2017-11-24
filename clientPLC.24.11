@@ -1,0 +1,131 @@
+fbTCP();
+fbRFID();
+
+CASE uiState OF
+	0:	//SETUP
+		GVL.xQA1_RIGHT := TRUE;
+		GVL.xMB20 := FALSE;
+		uiState := 10;
+		
+	10:	//TCP CONNECTION
+		IF GVL.xBG21 THEN
+			uiState := 11;
+		END_IF
+	11:
+		fbTCP.Reset();
+		uiState := 12;
+	12:
+		IF fbTCP.xReady THEN
+			uiState := 13;
+		END_IF
+	13:
+		fbTCP.Connect(sIP, uiPort);
+		uiState := 14;
+	14:
+		IF fbTCP.xConnected THEN
+			uiState := 20;
+		ELSIF fbTCP.xError THEN
+			uiState := 10;
+		END_IF
+		
+	20:	//RFID CONNECTION
+		IF GVL.xBG21 THEN
+			uiState := 21;
+		END_IF
+	21:
+		fbRFID.ClearError();
+		uiState := 22;
+	22:
+		IF fbRFID.xReady THEN
+			uiState := 23;
+		END_IF
+	23:
+		fbRFID.Connect(32,0,1);
+		uiState := 24;
+	24:
+		IF fbRFID.xConnected THEN
+			uiState := 30;
+		ELSIF fbRFID.xError THEN
+			uiState := 20;
+		END_IF
+		
+	30:	//READ AND SEND TAG
+		fbRFID.ReadTag(0, SIZEOF(fbRFIDData), ADR(fbRFIDData));
+		uiState := 31;
+	31:
+		IF fbRFID.xReady THEN
+			wRFIDTagID := dc_ecp.SwapWORD(fbRFIDData.uiCarrierID);
+			uiState := 32;
+		END_IF
+	32:
+		sRFIDTagID := WORD_TO_STRING(wRFIDTagID);
+		uiState := 33;
+	33:
+		IF fbTCP.xReady THEN
+			fbTCP.SendAndReceive(sRFIDTagID);
+			uiState := 34;
+		END_IF
+	34:
+		IF fbTCP.xReady THEN
+			sCommand := fbTCP.sReceived;
+			uiState := 35;
+		END_IF
+	35:
+		//fbTCP.Disconnect();
+		uiState := 36;
+	36:
+		IF fbTCP.xReady THEN
+			uiState := 37;
+		END_IF
+	37:
+		xReady := FALSE;
+		uiDecState := 10*(STRING_TO_UINT(sCommand)+1);
+		uiState := 40;
+		
+	40:	//EXECUTING COMMAND
+		IF xReady THEN
+			uiState := 20;
+		END_IF
+END_CASE
+
+IF NOT xReady THEN
+	CASE uiDecState OF
+		0:	//RELEASE CARRIER
+			GVL.xMB20 := TRUE;
+			uiDecState := 1;
+		1:
+			IF NOT GVL.xBG21 THEN
+				GVL.xMB20:=FALSE;
+				xReady := TRUE;
+			ELSE
+				uiDecState := 0;
+			END_IF
+			
+		10:	//THIS STATE LETS THE PALLET THROUGH WITHOUT DOING ANYTHING
+			sDecState := 'Releasing carrier without doing anything';
+			uiDecState := 0;
+			
+		20:	//THIS STATE HOLDS THE CARRIER FOR 2 SECONDS
+			sDecState := 'Holding carrier for 2 seconds';
+			tonHoldFor2s(IN := TRUE, PT := T#2S);
+			uiDecState := 21;
+		21:
+			tonHoldFor2s();
+			IF tonHoldFor2s.Q THEN
+				uiDecState := 22;
+			END_IF
+		22: 
+			tonHoldFor2s(IN := FALSE);
+			uiDecState := 0;
+		30:
+			GVL.xQA1_RIGHT := FALSE;
+			GVL.xQA1_STOP := TRUE;
+			uiDecState := 31;
+		31:
+			fbTCP.Disconnect();
+			
+		ELSE
+			uiDecState := 0;
+			sDecState := 'Invalid command';
+	END_CASE
+END_IF
