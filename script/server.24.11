@@ -1,0 +1,48 @@
+import socket
+
+carriers_dict = {}
+
+IP = '172.20.66.156'
+PORT = 60003
+BUFFER_SIZE = 4096
+
+def carrier_logic(rfid):
+        command = carriers_dict.get(rfid,0)
+        if command:
+                carriers_dict[rfid] += 1
+        else:
+                carriers_dict[rfid] = 1;
+        if str(rfid) == 'rfid6':
+                print 'Sending command: {}'.format('2')
+                return str(2)
+        else:
+                print 'Sending command: {}'.format(command)
+                return str(command)
+
+def handle_client_connection(client_s):
+        received = client_s.recv(BUFFER_SIZE)
+        if received:
+                rfid = 'rfid' + received
+                print 'Received: {}'.format(rfid)
+                client_s.send(carrier_logic(rfid))
+        
+
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.bind((IP,PORT))
+s.listen(2)
+print 'Listening on {}:{}'.format(IP,PORT)
+conn, client_addr = s.accept()
+print 'Accepted connection from {}:{}'.format(client_addr[0], client_addr[1])
+
+while True:
+        try:
+                handle_client_connection(conn)
+                                
+        except KeyboardInterrupt:
+                print("The process was interrupted by a human operator")
+                break
+
+print("Shutdown procedure initiated")
+s.close()
+conn.shutdown(1)
+conn.close()
